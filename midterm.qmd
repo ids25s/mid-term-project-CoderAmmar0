@@ -16,3 +16,92 @@ format:
       - left=20mm
 ##  docx: Never, unless to accommodate a collaborator
 ---
+# Introduction
+
+## Overview
+
+The NYC 311 Service Requests dataset contains reports related to various city issues, including sewer-related complaints. This analysis focuses on two primary sewer-related complaints for 2024:
+
+1. **Street Flooding (SF)**: Reports of standing water or street flooding.
+2. **Catch Basin (CB)**: Reports of clogged or defective catch basins that prevent proper drainage.
+
+These complaints provide insights into both immediate street flooding issues and underlying infrastructural challenges.
+
+## Data Dictionary
+
+| Column Name                        | Description                                              | Data Type            |
+|-------------------------------------|----------------------------------------------------------|----------------------|
+| **Unique Key**                      | Unique identifier for each service request              | Text                |
+| **Created Date**                    | Date and time the service request was created           | Floating Timestamp  |
+| **Closed Date**                     | Date and time the service request was closed            | Floating Timestamp  |
+| **Agency**                           | City agency responsible for the complaint               | Text                |
+| **Agency Name**                      | Full name of the responding agency                      | Text                |
+| **Complaint Type**                   | High-level category of the complaint                    | Text                |
+| **Descriptor**                       | Specific details about the complaint                    | Text                |
+| **Location Type**                    | Type of location information available                  | Text                |
+| **Incident Zip**                     | ZIP code where the complaint was filed                  | Text                |
+| **Incident Address**                 | Address where the complaint was reported                | Text                |
+| **Street Name**                      | Street name of incident location                        | Text                |
+| **Cross Street 1**                   | First cross street based on geo-validation              | Text                |
+| **Cross Street 2**                   | Second cross street based on geo-validation             | Text                |
+| **Intersection Street 1**            | First intersecting street based on geo-validation       | Text                |
+| **Intersection Street 2**            | Second intersecting street based on geo-validation      | Text                |
+| **Address Type**                     | Type of incident location information                   | Text                |
+| **City**                              | City of the incident location                           | Text                |
+| **Landmark**                          | Name of landmark if applicable                         | Text                |
+| **Facility Type**                     | Type of city facility associated with SR               | Text                |
+| **Status**                            | Current status of the complaint                         | Text                |
+| **Due Date**                          | Expected update date by responding agency              | Floating Timestamp  |
+| **Resolution Description**            | Details of the resolution or current status             | Text                |
+| **Resolution Action Updated Date**    | Last update of resolution actions                      | Floating Timestamp  |
+| **Community Board**                   | Community board information from geo-validation        | Text                |
+| **BBL**                               | Borough Block and Lot identifier                       | Text                |
+| **Borough**                           | Borough of the incident                                | Text                |
+| **X Coordinate (State Plane)**        | Geo-validated X coordinate of the incident location    | Number              |
+| **Y Coordinate (State Plane)**        | Geo-validated Y coordinate of the incident location    | Number              |
+| **Open Data Channel Type**            | Submission method (Phone, Online, Mobile, etc.)       | Text                |
+| **Park Facility Name**                | Name of park facility if applicable                   | Text                |
+| **Park Borough**                      | Borough of the park facility                          | Text                |
+| **Vehicle Type**                      | Type of TLC vehicle if applicable                     | Text                |
+| **Taxi Company Borough**              | Borough of the taxi company if applicable             | Text                |
+| **Taxi Pick Up Location**             | Taxi pick-up location if applicable                   | Text                |
+| **Bridge Highway Name**               | Name of bridge/highway if applicable                  | Text                |
+| **Bridge Highway Direction**          | Direction of bridge/highway issue                     | Text                |
+| **Road Ramp**                          | Specifies if the issue occurred on a road or ramp     | Text                |
+| **Bridge Highway Segment**            | Segment of the bridge/highway where issue occurred    | Text                |
+| **Latitude**                          | Latitude coordinate of the incident location          | Number              |
+| **Longitude**                         | Longitude coordinate of the incident location         | Number              |
+| **Location**                          | Combination of latitude and longitude                | Location            |
+
+## Exploring Data
+
+```{python}
+import pandas as pd
+
+# Load the dataset
+file_path = "data/nycflood2024.csv"
+df = pd.read_csv(file_path)
+
+# Display basic info about the dataset
+df_info = df.info()
+
+# Show first few rows
+df_head = df.head(3)
+
+df_info, df_head
+
+```
+
+The dataset contains Street Flooding (SF) and Catch Basin (CB) complaints from 
+2024, extracted from 9,483 service requests. Key columns relevant to the 
+analysis include that:  
+ 
+- **Descriptor**: Specifies whether the complaint is about Street Flooding or
+  Catch Basin Clogged/Flooding.  
+- **Created Date**: Indicates when the complaint was reported.  
+- **Borough**: Provides the location of the complaint within NYC.  
+- **Latitude/Longitude**: Contains geographic coordinates for spatial analysis  
+  and mapping.  
+
+
+# Answering The Project Questions
