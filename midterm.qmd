@@ -555,10 +555,10 @@ Below is my reasoning and the approaches I tested.
   - Adjusted transparency (alpha=0.6) to keep overlapping points visible.
 
 - **Other Ideas I Explored**  
-  - Interactive Map (Folium) with Marker Clustering – Effective when zoomed in,  
-    but one descriptor dominated at lower zoom levels.  
-  - Grouping Complaints by Location – Reduced overlap but lost individual report  
-    granularity.
+  - Interactive Map (Folium) with Marker Clustering
+     - Effective when zoomed in, but one descriptor dominated at lower zoom levels.  
+  - Grouping Complaints by Location
+    - Reduced overlap but lost individual report granularity.
 
 - **Final Thoughts**  
   A static map was the best choice because it ensured visibility of all complaints,  
@@ -695,5 +695,4 @@ Street Flooding (SF) and Catch Basin Clogged (CB) complaints
     borough.
 
 ### Part iv
-
-
+Is there significant difference in response time between SF and CB complaints? Across different boroughs? Does the difference between SF and CB depend on borough? State your hypothesis, justify your test, and summarize your results in plain English.
