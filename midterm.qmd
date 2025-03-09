@@ -482,3 +482,218 @@ Suggestions for Data Curation
 ## Part B (Exploratory analysis)
 
 ### Part i
+Visualize the locations of complaints on a NYC map, with different symbols for different descriptors.
+```{python}
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import contextily as ctx
+
+# Filter out rows with missing latitude, longitude, or descriptor
+df_filtered = df.dropna(subset=['latitude', 'longitude', 'descriptor'])
+
+# Convert to a GeoDataFrame
+gdf = gpd.GeoDataFrame(df_filtered, geometry=gpd.points_from_xy(df_filtered.longitude, df_filtered.latitude), crs="EPSG:4326")
+
+gdf = gdf.to_crs(epsg=3857)
+
+# Define descriptor categories, marker styles, and sizes
+descriptor_markers = {
+    'Street Flooding (SJ)': 'o',  # Circles
+    'Catch Basin Clogged/Flooding (Use Comments) (SC)': 's'  # Squares
+}
+descriptor_colors = {
+    'Street Flooding (SJ)': 'red',
+    'Catch Basin Clogged/Flooding (Use Comments) (SC)': 'blue'
+}
+
+# Create figure
+fig, ax = plt.subplots(figsize=(10, 10))
+
+# Plot each descriptor type separately
+for descriptor, marker in descriptor_markers.items():
+    subset = gdf[gdf['descriptor'] == descriptor]
+    ax.scatter(
+        subset.geometry.x, subset.geometry.y, 
+        s=20,  # Standard size for markers
+        c=descriptor_colors[descriptor], 
+        label=descriptor, 
+        marker=marker, alpha=0.6
+    )
+
+# Add basemap
+ctx.add_basemap(ax, source=ctx.providers.CartoDB.Positron)
+
+# Add legend and title
+ax.legend(title="Complaint Descriptors", loc='upper right')
+ax.set_title("NYC Flood Complaints on a Static Map")
+
+# Remove x and y axes
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_frame_on(False)
+
+# Show the plot
+plt.show()
+
+```
+
+#### Reflection on Using a Static Map for NYC Flood Complaints  
+
+I initially considered using interactive maps (e.g., Folium) to visualize NYC flood  
+complaints but ultimately opted for a static map using GeoPandas and Matplotlib.  
+Below is my reasoning and the approaches I tested.
+
+- **Clear & Visible at All Zoom Levels**  
+  - Interactive maps hid some complaints until zoomed in.  
+  - Folium’s MarkerCluster grouped markers, making it hard to distinguish 
+    overlapping points.
+  - A static map ensures all complaints remain visible.
+
+- **Customization & Flexibility**  
+  - Used different shapes, o for circles, s for squares) to differentiate  
+    complaint types.  
+  - Adjusted transparency (alpha=0.6) to keep overlapping points visible.
+
+- **Other Ideas I Explored**  
+  - Interactive Map (Folium) with Marker Clustering – Effective when zoomed in,  
+    but one descriptor dominated at lower zoom levels.  
+  - Grouping Complaints by Location – Reduced overlap but lost individual report  
+    granularity.
+
+- **Final Thoughts**  
+  A static map was the best choice because it ensured visibility of all complaints,  
+  provided clear differentiation, and allowed for effective presentation.
+
+#### Further Visualization  
+
+While analyzing the static map, I noticed that Catch Basin complaints appear
+more frequently than Street Flooding complaints, which led me to investigate 
+the distribution further. To quantify this difference, I decided to create 
+a pie chart to visualize the percentage share of each complaint type and a bar 
+chart to compare their counts.
+
+```{python}
+import matplotlib.pyplot as plt
+
+# Replace long descriptor with "Catch Basin"
+df_filtered['descriptor'] = df_filtered['descriptor'].replace("Catch Basin Clogged/Flooding (Use Comments) (SC)", "Catch Basin")
+
+# Count occurrences of each descriptor
+descriptor_counts = df_filtered['descriptor'].value_counts()
+
+# Define colors
+colors = ['blue', 'red']
+
+# Plot pie chart
+descriptor_counts.plot.pie(autopct='%1.1f%%', colors=colors, startangle=90, figsize=(8, 6), title="Percentage Distribution of Flood Complaints")
+plt.ylabel("")  # Hide y-axis label for cleaner look
+plt.show()
+
+# Plot bar chart
+descriptor_counts.plot.bar(color=colors, alpha=0.7, figsize=(8, 6), title="Count of NYC Flood Complaints by Type")
+plt.ylabel("Count of Complaints")
+plt.show()
+
+```
+My intuition was correct, approximately two-thirds of the complaints are related
+to catch basins, while one-third are for street flooding.
+
+
+### Part ii 
+Create a variable response_time, which is the duration from created_date to closed_date.
+
+```{python}
+# Convert created_date and closed_date to datetime format
+df['created_date'] = pd.to_datetime(df['created_date'], errors='coerce')
+df['closed_date'] = pd.to_datetime(df['closed_date'], errors='coerce')
+
+# Calculate response_time as the duration from created_date to closed_date
+df['response_time'] = (df['closed_date'] - df['created_date']).dt.total_seconds() / 3600  # Convert to hours
+
+# Check if variable was created
+
+df["response_time"].head()
+```
+
+The varaible was created, I calculated response_time by converting both
+created_date and closed_date to datetime format, then subtracting created_date 
+from closed_date. The result was converted to hours using
+.dt.total_seconds() / 3600, allowing for easier analysis of how long it took to
+resolve each complaint.
+
+### Part iii
+Visualize the comparison of response time by complaint descriptor and borough. 
+The original may not be the best given the long tail or outlers.
+
+```{python}
+import seaborn as sns
+import numpy as np
+
+# Remove negative response times (likely data errors)
+df_filtered = df[df['response_time'] >= 0].copy()
+
+# Remove extreme outliers using the IQR method
+Q1 = df_filtered['response_time'].quantile(0.25)
+Q3 = df_filtered['response_time'].quantile(0.75)
+IQR = Q3 - Q1
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+
+df_filtered = df_filtered[(df_filtered['response_time'] >= lower_bound) & (df_filtered['response_time'] <= upper_bound)]
+
+# Create a boxplot using seaborn to compare response times by complaint type and borough
+plt.figure(figsize=(12, 6))
+sns.boxplot(
+    data=df_filtered, x='borough', y='response_time', hue='descriptor', 
+    showfliers=False, palette={"Street Flooding (SJ)": "red", "Catch Basin Clogged/Flooding (Use Comments) (SC)": "blue"}
+)
+plt.title("Response Time Comparison by Complaint Type and Borough (Without Outliers)")
+plt.ylabel("Response Time (Hours)")
+plt.xlabel("Borough")
+plt.legend(title="Complaint Type")
+plt.xticks(rotation=45)
+plt.show()
+```
+
+I removed negative response times since they are likely data entry errors and 
+do not make logical sense. To handle outliers, I used the Interquartile Range
+(IQR) method, which removes extreme values beyond 1.5 times the IQR. This helps
+focus on typical response times without skewing the visualization. For 
+visualization, I chose a Seaborn boxplot to effectively compare median response
+times and variability across boroughs while highlighting differences between
+Street Flooding (SF) and Catch Basin Clogged (CB) complaints
+
+#### Analysis of Response Time Comparison by Complaint Type and Borough
+
+- **Catch Basin Complaints Have Longer Response Times**  
+  - The blue boxplots (representing Catch Basin complaints) generally show 
+    higher median response times and wider interquartile ranges (IQRs) compared
+    to street flooding complaints.  
+  - Particularly in Staten Island, the Bronx, and Queens, response times for  
+    catch basin complaints show significant variation, with upper whiskers  
+    extending well beyond 100 hours in some cases.
+
+- **Street Flooding Complaints Are Resolved Faster**  
+  - The red boxplots (representing Street Flooding complaints) consistently  
+    show lower median response times across all boroughs.  
+  - In Manhattan, response times for street flooding are especially low, with  
+    most complaints resolved in under 10 hours, suggesting a quicker resolution  
+    process compared to other boroughs.
+
+- **High Variability in Staten Island and the Bronx**  
+  - Staten Island shows the widest range in response times for catch basin  
+    complaints, with some cases taking well over 150 hours to resolve.  
+  - The Bronx also exhibits a large spread in response times, particularly for  
+    catch basin complaints, though street flooding complaints remain relatively  
+    consistent.
+
+- **Brooklyn and Manhattan Have the Fastest Response Times Overall**  
+  - Brooklyn’s response times for both complaint types are relatively low and  
+    consistent, with fewer extreme outliers.  
+  - Manhattan has the shortest response times for both street flooding and  
+    catch basin complaints, indicating efficient response handling in this  
+    borough.
+
+### Part iv
+
+
