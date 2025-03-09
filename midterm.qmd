@@ -432,3 +432,53 @@ while the frequent exact-match timestamps and standard time closures could
 warrant further investigation into data entry or automated logging processes.  
 
 ### Part vi
+Summarize your suggestions to the data curator in several bullet points.
+
+
+Suggestions for Data Curation  
+
+- **Fix Date Anomalies:**  
+  - Investigate and correct the 1 case where closed_date is earlier than  
+    created_date.  
+  - Review 160 cases where created_date and closed_date are identical to  
+    ensure accurate resolution timestamps.  
+  - Examine why 202 cases have closed_date exactly at midnight or noon, this  
+    might indicate system generated timestamps rather than actual resolution  
+    times.  
+
+- **Address Missing and Inconsistent Data:**  
+  - Missing ZIP codes that also lack latitude and longitude should be reviewed  
+    for potential recovery from other available location data.  
+  - Some rows have unspecified boroughs, which might impact geographic  
+    analysis, consider validating or imputing these values.  
+
+- **Remove Redundant Columns to Improve Data Efficiency:**  
+  - Agency Name (redundant with Agency)  
+  - Park Borough (redundant with Borough)  
+  - Location (duplicates Latitude and Longitude)  
+  - State Plane Coordinates (X, Y) (redundant with Latitude/Longitude)  
+
+- **Standardize Data Entry and Logging Processes:**  
+  - Ensure a consistent methodology for logging timestamps to prevent  
+    artificial patterns.  
+  - Improve the accuracy of missing or vague location details by  
+    cross referencing available datasets.  
+
+- **Handle Completely Empty and Highly Missing Columns:**  
+  - The following columns are completely empty and provide no useful data:  
+    - Location Type  
+    - Landmark  
+    - Facility Type  
+    - Due Date  
+    - Vehicle Type  
+    - Taxi Company Borough  
+    - Taxi Pick Up Location  
+    - Bridge Highway Name  
+    - Bridge Highway Direction  
+    - Road Ramp  
+    - Bridge Highway Segment  
+
+
+## Part B (Exploratory analysis)
+
+### Part i
