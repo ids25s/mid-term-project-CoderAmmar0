@@ -96,12 +96,79 @@ The dataset contains Street Flooding (SF) and Catch Basin (CB) complaints from
 2024, extracted from 9,483 service requests. Key columns relevant to the 
 analysis include that:  
  
-- **Descriptor**: Specifies whether the complaint is about Street Flooding or
-  Catch Basin Clogged/Flooding.  
+- **Descriptor**: Specifies whether the complaint is about Street Flooding or 
+Catch Basin Clogged/Flooding.  
 - **Created Date**: Indicates when the complaint was reported.  
-- **Borough**: Provides the location of the complaint within NYC.  
-- **Latitude/Longitude**: Contains geographic coordinates for spatial analysis  
-  and mapping.  
+- **Borough**: Provides the location of the complaint within NYC.
+- **Incident Zip**: Provides the ZIP code of the complaint.   
+- **Latitude/Longitude**: Contains geographic coordinates for spatial analysis 
+and mapping.  
 
 
 # Answering The Project Questions
+
+## Part A (Data Cleaning)
+
+### Part i
+Import the data, rename the columns with our preferred styles.
+
+```{python}
+import pandas as pd
+
+# Load the dataset
+file_path = "data/nycflood2024.csv"
+
+df = pd.read_csv(file_path)
+# Convert column names to lowercase and replace spaces with underscores
+df.columns = df.columns.str.lower().str.replace(" ", "_")
+
+# Display cleaned column names
+df.columns
+```
+
+The column names appear to have been renamed and cleaned properly.
+### Part ii
+Summarize the missing information. Are there variables that are close to 
+completely missing?
+
+```{python}
+# Check for missing values
+missing_values = df.isnull().sum()
+
+# Calculate the percentage of missing values per column
+missing_summary = (df.isnull().sum() / len(df)) * 100
+
+# Identify columns that are completely missing 
+highly_missing_columns = missing_summary[missing_summary == 100]
+
+# Display summary of missing data
+print(missing_values,missing_summary, highly_missing_columns)
+```
+
+
+Several variables are completely missing (100%), making them irrelevant
+for analysis. These include:
+
+- **location_type**
+- **landmark**
+- **facility_type**
+- **due_date**
+- **vehicle_type**
+- **taxi_company_borough**
+- **taxi_pick_up_location**
+- **bridge_highway_name**
+- **bridge_highway_direction**
+- **road_ramp**
+- **bridge_highway_segment**
+
+Other Key Variables with Significant Missing Data:
+
+- **incident_address, street_name, cross_street_1, cross_street_2** 
+  (23.6% missing) This could impact location-based analysis.
+- **intersection_street_1, intersection_street_2** 
+  (76.4% missing) These are mostly empty.
+- **bbl** (27.8% missing) Used for property identification.
+- **closed_date** (2.2% missing) Some complaints are still open.
+- **latitude, longitude** (1% missing) A small fraction lacks 
+  geographic data.
+
