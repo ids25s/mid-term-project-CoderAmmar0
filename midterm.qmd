@@ -695,4 +695,169 @@ Street Flooding (SF) and Catch Basin Clogged (CB) complaints
     borough.
 
 ### Part iv
-Is there significant difference in response time between SF and CB complaints? Across different boroughs? Does the difference between SF and CB depend on borough? State your hypothesis, justify your test, and summarize your results in plain English.
+Is there significant difference in response time between SF and CB complaints? 
+Across different boroughs? Does the difference between SF and CB depend on 
+borough? State your hypothesis, justify your test, and summarize your results 
+in plain English.
+
+#### Is there significant difference in response time between SF and CB complaints? 
+
+First we will test "Is there significant difference in response time between
+SF and CB complaints?":
+
+- **Hypothesis**  
+  - **Null Hypothesis (H₀):** There is no significant difference in response  
+    times between Street Flooding (SF) and Catch Basin (CB) complaints.  
+  - **Alternative Hypothesis (H₁):** There is a significant difference in  
+    response times between SF and CB complaints.  
+
+Welch’s T-test is ideal for comparing two groups with potentially unequal
+variances and sample sizes, making it well-suited for analyzing response
+times across different complaint types. Unlike a standard T-test, it does not
+assume equal variances, providing a more reliable estimate in cases where 
+distribution and variability differ.
+
+
+```{python}
+import scipy.stats as stats
+
+df_filtered = df.dropna(subset=['response_time', 'descriptor', 'borough'])
+df_filtered = df_filtered[df_filtered['response_time'] >= 0]
+
+# Separate response times for SF and CB
+sf_times = df_filtered[df_filtered['descriptor'] == 'Street Flooding (SJ)']['response_time']
+cb_times = df_filtered[df_filtered['descriptor'] == 'Catch Basin']['response_time']
+
+# Perform an independent t-test
+t_stat, p_value = stats.ttest_ind(sf_times, cb_times, equal_var=False)
+
+print(t_stat,p_value)
+```
+
+The p-value is nearly zero, which is far below the 0.05.This means we reject 
+the null hypothesis and conclude that response times for SF and CB 
+complaints are significantly different.
+
+#### Is there significant difference in response time borough? 
+
+Now lets test "Is there significant difference in response time between SF and CB complaints?":
+- **Hypothesis**  
+
+    - **Null Hypothesis (H₀):**  
+    There is no significant difference in response times across different 
+    boroughs.
+
+    - **Alternative Hypothesis (H₁):**  
+    There is a significant difference in response times across different 
+    boroughs.
+
+One-Way ANOVA is used to compare response times across multiple boroughs to 
+determine if significant differences exist. It analyzes variations in mean 
+response times across more than two groups.
+
+```{python}
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+
+# Define the ANOVA model
+anova_model = ols('response_time ~ C(borough)', data=df_filtered).fit()
+
+# Perform ANOVA
+anova_results = sm.stats.anova_lm(anova_model, typ=2)
+
+# Display ANOVA results
+anova_results
+```
+
+Since this is far below 0.05, we reject the null hypothesis and conclude that 
+response times vary significantly across boroughs.
+
+#### Does the difference between SF and CB depend on borough?
+Now lets test "Does the difference between SF and CB depend on borough?":
+
+Two-Way ANOVA examines the effects of both borough and complaint type on response times, as well as their interaction. This test helps determine whether borough influences the difference in response times between SF and CB complaints.
+
+**Null Hypothesis (H₀):**  
+    - The difference between SF and CB does not depend on the borough.
+
+**Alternative Hypothesis (H₁):**  
+    - The difference in response times depends on the borough (some boroughs may  
+    respond faster to one type of complaint than another).
+
+```{python}
+# Analyze response time across different boroughs
+borough_stats = df_filtered.groupby(['borough', 'descriptor'])['response_time'].mean().unstack()
+
+# Test interaction effect: Does the difference between SF and CB depend on borough
+# Perform a two-way ANOVA test
+anova_model = ols('response_time ~ C(descriptor) * C(borough)', data=df_filtered).fit()
+anova_results = sm.stats.anova_lm(anova_model, typ=2)
+anova_results
+```
+Response times differ significantly between SF and CB complaints. The large  
+F-statistic (128.20) and a small p-value lower than 0.05 confirm that SF and CB  
+complaints are resolved at significantly different speeds.
+
+Response times also vary across boroughs. The high F-statistic (46.06) and a  
+small p-value lower than 0.05 indicate that boroughs differ significantly in  
+complaint resolution speed, with some responding much faster or slower than  
+others.
+
+Additionally, borough impacts how SF and CB response times compare. The small  
+interaction effect and a p-value lower than 0.05 confirm that the gap between  
+SF and CB response times depends on the borough, meaning different areas  
+prioritize complaint types differently.
+
+### Part v
+Create a binary variable over3d to indicate that a service request took three days or longer to close.
+
+```{python}
+# Create the binary variable 'over3d' (1 if response_time is 72 hours or more, else 0)
+df['over3d'] = (df['response_time'] >= 72).astype(int)
+
+```
+
+I have added the column, but now lets check if it works
+
+```{python}
+# Check if all rows where over3d = 1 have response_time >= 72
+check_over3d = df[df['over3d'] == 1]['response_time'].min()  # Should be at least 72
+
+# Check if all rows where over3d = 0 have response_time < 72
+check_under3d = df[df['over3d'] == 0]['response_time'].max()  # Should be less than 72
+
+print(check_under3d)
+print(check_over3d)
+
+```
+It works,as the minimum response time for category 1 exceeds 72 hours, while the
+maximum response time for category 0 remains below 72 hours.
+
+### Patt vi
+Does over3d depend on the complaint descriptor, borough, or weekday
+(vs weekend/holiday)? State your hypotheses, justify your test, and 
+summarize your results.
+
+```{python}
+from statsmodels.formula.api import logit
+
+# Create a binary variable for weekday vs. weekend/holiday
+df['weekday'] = df['created_date'].dt.weekday  # 0=Monday, 6=Sunday
+df['weekend_holiday'] = df['weekday'].apply(lambda x: 1 if x >= 5 else 0)  # 1 for Saturday/Sunday
+
+# Logistic Regression Model (over3d as the dependent variable)
+logit_model = logit("over3d ~ C(descriptor) + C(borough) + C(weekend_holiday)", data=df).fit()
+
+# Get summary results
+logit_results = logit_model.summary()
+
+# Display results
+logit_results
+
+```
+
+
+
+
+
+
