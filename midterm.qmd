@@ -172,3 +172,263 @@ Other Key Variables with Significant Missing Data:
 - **latitude, longitude** (1% missing) A small fraction lacks 
   geographic data.
 
+### Part iii
+The following columns appear redundant:  
+
+- **Agency Name** (redundant with "Agency")  
+- **Park Borough** (redundant with "Borough")  
+- **Location** (duplicates Latitude and Longitude)  
+- **State Plane Coordinates (X, Y)** (redundant with Latitude/Longitude) 
+
+```{python}
+import pyarrow.feather as feather
+import os
+# Store as Arrow (Feather) format for efficiency
+arrow_file_path = "data/nycflood2024.feather"
+feather.write_feather(df, arrow_file_path)
+
+# Compare file sizes
+csv_size = os.path.getsize(file_path) / (1024 * 1024)  # Convert to MB
+arrow_size = os.path.getsize(arrow_file_path) / (1024 * 1024)  # Convert to MB
+
+csv_size, arrow_size, (1 - (arrow_size / csv_size)) * 100 
+
+```
+
+The dataset has been converted to Feather format and is stored in the **data**  
+directory. The results are:  
+
+- **Original CSV size:** 5.82 MB  
+- **Arrow (Feather) size:** 1.85 MB  
+- **Efficiency gain:** 68.2% reduction in storage size  
+
+The Feather format is significantly more storage-efficient than CSV, reducing  
+the file size by nearly 70%. This results in:  
+
+- Faster load times  
+- Less disk space usage  
+- More efficient data processing  
+
+The reduction is mainly due to better compression and efficient data types.  
+CSV stores data as raw text, while Arrow uses a binary columnar format,  
+resulting in improved compression. Additionally, Arrow optimizes how numerical  
+and categorical data are stored, further enhancing storage efficiency.  
+
+
+### Part iv
+Are there invalid NYC zipcode or borough? Can some of the missing values be 
+filled? Fill them if yes.
+```{python}
+# Create a dictionary mapping ZIP codes to boroughs
+valid_zip_to_borough = {
+    10001: "Manhattan", 10002: "Manhattan", 10003: "Manhattan", 10004: "Manhattan",
+    10005: "Manhattan", 10006: "Manhattan", 10007: "Manhattan", 10009: "Manhattan",
+    10010: "Manhattan", 10011: "Manhattan", 10012: "Manhattan", 10013: "Manhattan",
+    10014: "Manhattan", 10015: "Manhattan", 10016: "Manhattan", 10017: "Manhattan",
+    10018: "Manhattan", 10019: "Manhattan", 10020: "Manhattan", 10021: "Manhattan",
+    10022: "Manhattan", 10023: "Manhattan", 10024: "Manhattan", 10025: "Manhattan",
+    10026: "Manhattan", 10027: "Manhattan", 10028: "Manhattan", 10029: "Manhattan",
+    10030: "Manhattan", 10031: "Manhattan", 10032: "Manhattan", 10033: "Manhattan",
+    10034: "Manhattan", 10035: "Manhattan", 10036: "Manhattan", 10037: "Manhattan",
+    10038: "Manhattan", 10039: "Manhattan", 10040: "Manhattan", 10041: "Manhattan",
+    10044: "Manhattan", 10045: "Manhattan", 10048: "Manhattan", 10055: "Manhattan",
+    10060: "Manhattan", 10069: "Manhattan", 10090: "Manhattan", 10095: "Manhattan",
+    10098: "Manhattan", 10099: "Manhattan", 10103: "Manhattan", 10104: "Manhattan",
+    10105: "Manhattan", 10106: "Manhattan", 10107: "Manhattan", 10110: "Manhattan",
+    10111: "Manhattan", 10112: "Manhattan", 10115: "Manhattan", 10118: "Manhattan",
+    10119: "Manhattan", 10120: "Manhattan", 10121: "Manhattan", 10122: "Manhattan",
+    10123: "Manhattan", 10128: "Manhattan", 10151: "Manhattan", 10152: "Manhattan",
+    10153: "Manhattan", 10154: "Manhattan", 10155: "Manhattan", 10158: "Manhattan",
+    10161: "Manhattan", 10162: "Manhattan", 10165: "Manhattan", 10166: "Manhattan",
+    10167: "Manhattan", 10168: "Manhattan", 10169: "Manhattan", 10170: "Manhattan",
+    10171: "Manhattan", 10172: "Manhattan", 10173: "Manhattan", 10174: "Manhattan",
+    10175: "Manhattan", 10176: "Manhattan", 10177: "Manhattan", 10178: "Manhattan",
+    10199: "Manhattan", 10270: "Manhattan", 10271: "Manhattan", 10278: "Manhattan",
+    10279: "Manhattan", 10280: "Manhattan", 10281: "Manhattan", 10282: "Manhattan",
+    10301: "Staten Island", 10302: "Staten Island", 10303: "Staten Island",
+    10304: "Staten Island", 10305: "Staten Island", 10306: "Staten Island",
+    10307: "Staten Island", 10308: "Staten Island", 10309: "Staten Island",
+    10310: "Staten Island", 10311: "Staten Island", 10312: "Staten Island",
+    10314: "Staten Island", 10451: "Bronx", 10452: "Bronx", 10453: "Bronx",
+    10454: "Bronx", 10455: "Bronx", 10456: "Bronx", 10457: "Bronx", 10458: "Bronx",
+    10459: "Bronx", 10460: "Bronx", 10461: "Bronx", 10462: "Bronx", 10463: "Bronx",
+    10464: "Bronx", 10465: "Bronx", 10466: "Bronx", 10467: "Bronx", 10468: "Bronx",
+    10469: "Bronx", 10470: "Bronx", 10471: "Bronx", 10472: "Bronx", 10473: "Bronx",
+    10474: "Bronx", 10475: "Bronx", 11004: "Queens", 11101: "Queens",
+    11102: "Queens", 11103: "Queens", 11104: "Queens", 11105: "Queens",
+    11106: "Queens", 11109: "Queens", 11201: "Brooklyn", 11203: "Brooklyn",
+    11204: "Brooklyn", 11205: "Brooklyn", 11206: "Brooklyn", 11207: "Brooklyn",
+    11208: "Brooklyn", 11209: "Brooklyn", 11210: "Brooklyn", 11211: "Brooklyn",
+    11212: "Brooklyn", 11213: "Brooklyn", 11214: "Brooklyn", 11215: "Brooklyn",
+    11216: "Brooklyn", 11217: "Brooklyn", 11218: "Brooklyn", 11219: "Brooklyn",
+    11220: "Brooklyn", 11221: "Brooklyn", 11222: "Brooklyn", 11223: "Brooklyn",
+    11224: "Brooklyn", 11225: "Brooklyn", 11226: "Brooklyn", 11228: "Brooklyn",
+    11229: "Brooklyn", 11230: "Brooklyn", 11231: "Brooklyn", 11232: "Brooklyn",
+    11233: "Brooklyn", 11234: "Brooklyn", 11235: "Brooklyn", 11236: "Brooklyn",
+    11237: "Brooklyn", 11238: "Brooklyn", 11239: "Brooklyn", 11249: "Brooklyn",
+    11351: "Queens", 11354: "Queens", 11355: "Queens", 11356: "Queens",
+    11357: "Queens", 11358: "Queens", 11359: "Queens", 11360: "Queens",
+    11361: "Queens", 11362: "Queens", 11363: "Queens", 11364: "Queens",
+    11365: "Queens", 11366: "Queens", 11367: "Queens", 11368: "Queens",
+    11369: "Queens", 11370: "Queens", 11371: "Queens", 11372: "Queens",
+    11373: "Queens", 11374: "Queens", 11375: "Queens", 11377: "Queens",
+    11378: "Queens", 11379: "Queens", 11385: "Queens", 11411: "Queens",
+    11412: "Queens", 11413: "Queens", 11414: "Queens", 11415: "Queens",
+    11416: "Queens", 11417: "Queens", 11418: "Queens", 11419: "Queens",
+    11420: "Queens", 11421: "Queens", 11422: "Queens", 11423: "Queens",
+    11426: "Queens", 11427: "Queens", 11428: "Queens", 11429: "Queens",
+    11430: "Queens", 11432: "Queens", 11433: "Queens", 11434: "Queens",
+    11435: "Queens", 11436: "Queens", 11691: "Queens", 11692: "Queens",
+    11693: "Queens", 11694: "Queens", 11697: "Queens"
+}
+
+# Check invalid ZIP codes
+df["incident_zip"] = df["incident_zip"].astype(float).astype("Int64")
+invalid_zipcodes = df[~df["incident_zip"].isin(valid_zip_to_borough.keys())]["incident_zip"].unique()
+
+# Valid boroughs
+valid_boroughs = {"MANHATTAN", "BRONX", "BROOKLYN", "QUEENS", "STATEN ISLAND"}
+
+# Identify invalid boroughs
+invalid_boroughs = df[~df["borough"].str.upper().isin(valid_boroughs)]["borough"].unique()
+
+invalid_zipcodes,invalid_boroughs
+```
+
+
+The list of valid NYC ZIP codes was sourced from NYC by Natives to check for  
+validity.  
+
+The dataset includes five ZIP codes that are not present in the provided list  
+of valid NYC ZIP codes:  
+
+- **NaN (Missing ZIP codes):** Some records lack a ZIP code.  
+- **11040, 11001:** These belong to Nassau County, Long Island, NY, and are  
+  not part of NYC. However, since Nassau County borders Queens, some  
+  addresses may still be functionally tied to NYC, so it may be safer to  
+  retain them in the dataset.  
+- **10065, 10075:** These are valid NYC ZIP codes (Upper East Side,  
+  Manhattan) but were excluded from the provided list. However, they appear  
+  on an alternative source.  
+
+Additionally, some records have "Unspecified" as the borough instead of a  
+valid NYC borough.  
+
+All of these ZIP codes appear valid in context, so none will be removed.  
+Missing ZIP codes will be filled using longitude and latitude data, and 
+"Unspecified" boroughs will be filled using the zip code info we collected.
+
+Lets first look at the rows with "Unspecified" Borough:
+
+```{python}
+# Identify Unique IDs of rows that  had "Unspecified" boroughs
+unspecified_borough_ids_before = df[
+    df["borough"].str.upper() == "UNSPECIFIED"
+]["unique_key"].unique()
+
+unspecified_borough_ids_before
+```
+
+There is only two rows with "Unspecified" Boroughs, now lets fill them.
+```{python}
+
+#Fill missing boroughs using the ZIP to borough mapping
+df["borough"] = df.apply(
+    lambda row: valid_zip_to_borough.get(row["incident_zip"], row["borough"]),
+    axis=1
+)
+
+updated_boroughs = df[df["unique_key"].isin(unspecified_borough_ids_before)][["unique_key", "borough"]]
+
+# Display results
+updated_boroughs
+```
+
+Now that all boroughs have values, we will convert the entire column to 
+lowercase to improve consistency and standardization, making it easier to
+reference.
+
+```{python}
+df["borough"] = df["borough"].astype(str).str.lower()
+df["borough"].head()
+```
+
+Good. Now, let's move on to ZIP codes and determine the number of rows with 
+missing ZIP codes.
+
+```{python}
+# Identify unique IDs of rows with missing values in the "incident_zip" column
+missing_zipcode_ids = df[df["incident_zip"].isna()]["unique_key"].unique()
+
+missing_zipcode_ids
+```
+
+There seem to be four rows with missing zipcodes, lets see if they have longitude and latitude data to fill them:
+
+```{python}
+zip_lat_long = df[df["unique_key"].isin(missing_zipcode_ids)][["unique_key", "longitude","latitude"]]
+
+zip_lat_long
+```
+
+They all have to be missing the longitude and latitude data. At first, I  
+considered using geocoders to determine ZIP codes based on street addresses.  
+However, I realized that a single street address can correspond to multiple  
+ZIP codes, making it unreliable for accurate data filling.  
+
+### Part v
+Are there date errors? Examples are earlier closed_date than created_date; closed_date and created_date matching to the second; dates exactly at midnight or noon to the second.
+
+```{python}
+# Convert date columns to datetime format for analysis
+import pandas as pd
+
+df['created_date'] = pd.to_datetime(df['created_date'], errors='coerce')
+df['closed_date'] = pd.to_datetime(df['closed_date'], errors='coerce')
+
+# Identify records where closed_date is earlier than created_date
+closed_earlier_than_created = df[df['closed_date'] < df['created_date']][['unique_key', 'created_date', 'closed_date']]
+
+# Identify records where closed_date and created_date are exactly the same
+exact_match_dates = df[df['closed_date'] == df['created_date']][['unique_key', 'created_date', 'closed_date']]
+
+# Identify records where created_date is exactly at midnight or noon
+created_at_midnight_or_noon = df[df['created_date'].dt.time.isin([pd.Timestamp('00:00:00').time(), pd.Timestamp('12:00:00').time()])][['unique_key', 'created_date', 'closed_date']]
+
+# Identify records where closed_date is exactly at midnight or noon
+closed_at_midnight_or_noon = df[df['closed_date'].dt.time.isin([pd.Timestamp('00:00:00').time(), pd.Timestamp('12:00:00').time()])][['unique_key', 'created_date', 'closed_date']]
+
+# Print results
+print("Closed Earlier Than Created:")
+print(closed_earlier_than_created)
+print("\nExact Match Dates:")
+print(exact_match_dates)
+print("\nMidnight or Noon Created Dates:")
+print(created_at_midnight_or_noon)
+print("\nMidnight or Noon Closed Dates:")
+print(closed_at_midnight_or_noon)
+
+```
+
+Findings on Date Errors:  
+
+- **1 instance** where the closed_date occurs before the created_date, which  
+  is likely an error in data entry or processing.  
+
+- **160 instances** where both created_date and closed_date match exactly to  
+  the second. This may suggest potential data entry anomalies.  
+
+- **0 instances** where the created_date is exactly at 00:00:00 or 12:00:00.  
+  This suggests that request creation times are generally varied and not  
+  rounded to standard time markers.  
+
+- **202 instances** where the closed_date is at 00:00:00 or 12:00:00. This  
+  pattern may indicate systematic closing times, automated processing, or  
+  data standardization.   
+
+These findings suggest a mix of normal system behavior and possible data  
+inconsistencies. The single case of an earlier closed_date is a clear anomaly,  
+while the frequent exact-match timestamps and standard time closures could  
+warrant further investigation into data entry or automated logging processes.  
+
+### Part vi
