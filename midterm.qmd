@@ -838,6 +838,43 @@ Does over3d depend on the complaint descriptor, borough, or weekday
 (vs weekend/holiday)? State your hypotheses, justify your test, and 
 summarize your results.
 
+
+I will use a logistic regression because the outcome variable, over3d, is binary 
+(1 = complaint took 3+ days, 0 = resolved in less than 3 days). This model is 
+ideal for estimating the probability of a complaint exceeding three days based 
+on categorical predictors like complaint type, borough, and whether it was filed
+on a weekend or holiday. Unlike linear regression, logistic regression ensures 
+predicted probabilities remain between 0 and 1, making it the best choice for 
+this binary classification problem.
+
+Hypotheses:
+
+**Effect of Complaint Type**
+
+**Null Hypothesis (H₀):**  
+   - The complaint type does not affect whether it takes 3+ days to resolve.
+
+**Alternative Hypothesis (H₁):**  
+   - The complaint type does affect whether it takes 3+ days to resolve.
+
+**Effect of Borough**
+
+**Null Hypothesis (H₀):**  
+   - The borough does not influence the likelihood of taking 3+ days.
+
+**Alternative Hypothesis (H₁):**  
+   - The borough does have an effect.
+
+**Effect of Weekend/Holiday vs. Weekday Reporting**
+
+**Null Hypothesis (H₀):**  
+   - Complaints reported on weekends/holidays have the same probability of  
+     taking 3+ days as those reported on weekdays.
+
+**Alternative Hypothesis (H₁):**  
+   - Complaints reported on weekends/holidays are more/less likely to take 3+  
+     days.
+
 ```{python}
 from statsmodels.formula.api import logit
 
@@ -856,8 +893,248 @@ logit_results
 
 ```
 
+The logistic regression model estimates the likelihood of a complaint remaining  
+open for more than three days, with the intercept representing the baseline  
+probability for Catch Basin complaints in the Bronx on a weekday.
+
+**Effect of Complaint Type:**  
+   - Street Flooding complaints are resolved faster than Catch Basin  
+     complaints.  
+   - The large negative coefficient (-1.2855, p < 0.001) indicates that SF  
+     complaints are significantly less likely to remain open for more than  
+     three days, suggesting that Catch Basin issues face more delays.
+
+**Effect of Borough:**  
+   - Response times vary by borough.  
+   - Brooklyn has the fastest response times, showing the strongest negative  
+     effect (p < 0.001).  
+   - Manhattan and Queens also see quicker resolutions compared to the Bronx,  
+     but the difference is smaller.  
+   - Staten Island, however, is not significantly different from the Bronx  
+     (p = 0.167).
+
+**Effect of Weekend/Holiday Reporting:**  
+   - Complaints filed on weekends or holidays are slightly less likely to remain  
+     open for over three days.  
+   - The negative coefficient (-0.1754, p = 0.012) suggests that weekend  
+     complaints may be processed more quickly, possibly due to dedicated  
+     emergency response teams or a lower overall volume of complaints.
+
+Based on the small p-values, all null hypotheses were rejected, confirming that 
+complaint type, borough, and whether a complaint was filed on a 
+weekend/holiday all significantly impact response time. 
+
+## Part C (Modeling the occurrence of overly long response time)
+
+### Part i 
+Create a data set which contains the outcome variable over3d and variables that 
+might be useful in predicting it. Consider including time-of-day effects 
+(e.g., rush hour vs. late-night), seasonal trends, and neighborhood-level 
+demographics. Zip code level information could be useful too, such as the zip 
+code area and the ACS 2023 variables.
+
+First lets load the ACS2023 and Areas data.
+```{python}
+dfacs = pd.read_feather("data/acs2023.feather")
+dfareas = pd.read_feather("data/nyc_zip_areas.feather")
+
+print(dfacs.head(2))
+print(dfareas.head(2))
+
+```
+
+Lets merge the two datasets with the based on Zip code.
+
+```{python}
+# Strip any whitespace from the column names
+dfacs.columns = dfacs.columns.str.strip()
+dfareas.columns = dfareas.columns.str.strip()
+df.columns = df.columns.str.strip()
+
+# Rename the first column of dfareas to 'zip_code'
+dfareas.columns.values[0] = "zip_code"
+
+# Rename the last column of dfacs to 'zip_code'
+dfacs.columns.values[-1] = "zip_code"
+
+# Rename the nintth column of df to 'zip_code'
+df.columns.values[8] = "zip_code"
+
+# Fix ZIP Code Formatting in Dataset
+df["zip_code"] = df["zip_code"].astype(str)  # Convert to string
+df["zip_code"] = df["zip_code"].str.split('.').str[0]  # Remove decimal point if present
+# Merge the dataframes
+df = df.merge(dfacs, on="zip_code", how="left")
+df = df.merge(dfareas, on="zip_code", how="left")
 
 
+# Convert column names to lowercase and replace spaces with underscores
+df.columns = df.columns.str.lower().str.replace(" ", "_")
+print(df.head(1))
+
+```
+
+Now lets create some variables
+
+```{python}
+# Extract time-of-day effects
+df['hour_of_day'] = df['created_date'].dt.hour  # Extract hour from created date
+df['rush_hour'] = df['hour_of_day'].apply(lambda x: 1 if 7 <= x <= 10 or 16 <= x <= 19 else 0)  # Define rush hour
+
+# Extract seasonal trends
+df['month'] = df['created_date'].dt.month  # Extract month
+df['season'] = df['month'].apply(lambda x: 'winter' if x in [12, 1, 2] else 
+                                            'spring' if x in [3, 4, 5] else 
+                                            'summer' if x in [6, 7, 8] else 
+                                            'fall')
 
 
+# Dummy variable encoding for season
+df = pd.get_dummies(df, columns=['season'], drop_first=True)
 
+
+# Create a binary variable for weekend/holiday
+df['weekday'] = df['created_date'].dt.weekday  # 0=Monday, 6=Sunday
+df['weekend_holiday'] = df['weekday'].apply(lambda x: 1 if x >= 5 else 0)  # 1 for Saturday/Sunday
+
+# Calculate Population Density
+df['population_density'] = df['total_population'] / df['land_area_sq_miles']
+# Calculate Education Index (Higher Education Rate)
+df['education_index'] = (df['bachelor’s_degree_holders'] + df['graduate_degree_holders']) / df['total_population']
+
+# Calculate Unemployment Rate
+df['unemployment_rate'] = df['unemployed'] / df['labor_force']
+
+# Calculate Housing Affordability Index
+df['housing_affordability_index'] = df['median_home_value'] / df['median_household_income']
+
+df_model = df[['over3d', 'borough', 'descriptor', 'weekend_holiday', 'rush_hour', 
+               'season_spring', 'season_summer', 'season_winter',
+               'population_density', 'education_index', 
+               'unemployment_rate', 'housing_affordability_index']]
+
+print(df_model.head(2))
+```
+
+I created these variables to capture demographic and economic factors
+that may influence whether a service request takes three or more days (over3d) 
+to close. Time based features like rush hour, weekends, and seasons help analyze
+response time variations based on when a complaint is filed. Demographic and 
+economic indicators such as population density, education levels, unemployment, 
+and housing affordability provide insight into how neighborhood characteristics 
+impact service efficiency.
+
+### Part ii
+Randomly select 20% of the complaints as testing data with seeds 1234. Build a 
+logistic model to predict over3d for the complaints with the training data. 
+If you have tuning parameters, justify how they were selected.
+
+```{python}
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+
+# Drop rows with NaN values in the dataset before training the model
+df_model = df_model.dropna()
+
+# Define the features and target variable
+X = df_model.drop(columns=['over3d'])  # Features
+y = df_model['over3d']  # Target variable
+
+# Convert categorical variables into dummy variables
+X = pd.get_dummies(X, drop_first=True)
+
+# Split the data into training (80%) and testing (20%) with a fixed random seed
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1234)
+
+# Standardize numerical features for better model performance
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Build a logistic regression model
+logit_model = LogisticRegression(max_iter=500, solver='lbfgs', random_state=1234)
+logit_model.fit(X_train_scaled, y_train)
+
+# Make predictions
+y_pred = logit_model.predict(X_test_scaled)
+
+```
+
+**Tuning Parameters**
+
+- **max_iter=500:**  
+  - Increased iterations to ensure convergence, as logistic regression may  
+    struggle with large datasets.  
+
+- **solver='lbfgs':**  
+  - Default and efficient solver.  
+
+- **StandardScaler():**  
+  - Standardized numerical features to improve model stability and prevent  
+    feature dominance.
+
+### Part iii
+Construct the confusion matrix from your prediction with a threshold of 1/2 on 
+both training and testing data. Explain your accuracy, recall, precision, and 
+F1 score to a New Yorker.
+
+```{python}
+from sklearn.metrics import confusion_matrix, f1_score, classification_report
+# Compute confusion matrices for training and testing data
+conf_matrix_train = confusion_matrix(y_train, y_train_pred)
+conf_matrix_test = confusion_matrix(y_test, y_test_pred)
+
+# Compute performance metrics for testing data
+f1 = f1_score(y_test, y_test_pred, zero_division=0)
+
+# Generate classification report
+class_report = classification_report(y_test, y_test_pred)
+
+# results
+print("Confusion Matrix - Training Data:")
+print(conf_matrix_train)
+print("\nConfusion Matrix - Testing Data:")
+print(conf_matrix_test)
+print("\nF1 Score:", f1)
+print("\nClassification Report:")
+print(class_report)
+
+
+```
+
+Confusion Matrices
+
+**Training Data** 
+|                    | Predicted Non-Severe | Predicted Severe |
+|--------------------|---------------------|------------------|
+| **Actual Non-Severe** | 5920                | 8                |
+| **Actual Severe**     | 1598                | 8                |
+
+**Testing Data** 
+|                    | Predicted Non-Severe | Predicted Severe |
+|--------------------|---------------------|------------------|
+| **Actual Non-Severe** | 1484                | 2                |
+| **Actual Severe**     | 397                 | 1                |
+
+
+While the model has 79% accuracy, it mostly predicts quick resolutions correctly
+(over3d = 0) but fails to identify actual delays.  
+
+Precision, at 33%, means that two-thirds of flagged delays are actually  
+resolved quickly, making the model unreliable for predicting extended wait  
+times. Recall is 0% for over3d = 1, meaning the model never correctly  
+identifies real delays.
+
+With an F1 score of 0.0049, the model fails both ways,it doesn’t detect delays  
+and is usually wrong when it does. Despite its high accuracy, it cannot  
+predict real delays, making it ineffective. To improve, it needs a better  
+algorithm, class balancing, and stronger predictors.  
+
+If you are a New Yorker and your complaint takes 5+ days, this model will almost
+NEVER warn you ahead of time. The city might see 79% accuracy and assume the 
+model is working, but in reality, it fails at predicting real delays.
+
+
+### Part iv
