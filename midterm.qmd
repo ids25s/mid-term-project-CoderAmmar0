@@ -1059,6 +1059,7 @@ logit_model.fit(X_train_scaled, y_train)
 
 # Make predictions
 y_pred = logit_model.predict(X_test_scaled)
+y_train_pred = (logit_model.predict_proba(X_train_scaled)[:, 1] >= 0.5).astype(int)
 
 ```
 
@@ -1082,6 +1083,10 @@ F1 score to a New Yorker.
 
 ```{python}
 from sklearn.metrics import confusion_matrix, f1_score, classification_report
+
+y_train_pred = (logit_model.predict_proba(X_train_scaled)[:, 1] >= 0.5).astype(int)
+y_test_pred = (logit_model.predict_proba(X_test_scaled)[:, 1] >= 0.5).astype(int)
+
 # Compute confusion matrices for training and testing data
 conf_matrix_train = confusion_matrix(y_train, y_train_pred)
 conf_matrix_test = confusion_matrix(y_test, y_test_pred)
@@ -1106,17 +1111,19 @@ print(class_report)
 
 Confusion Matrices
 
-**Training Data** 
-|                            | Predicted Not Over 3 days | Predicted Over 3 days |
-|----------------------------|---------------------------|-----------------------|
-| **Actual Not Over 3 days** | 5920                      | 8                     |
-| **Actual Over 3 days**     | 1598                      | 8                     |
+**Training Data**  
 
-**Testing Data** 
 |                            | Predicted Not Over 3 days | Predicted Over 3 days |
-|----------------------------|---------------------------|-----------------------|
-| **Actual Not Over 3 days** | 1484                      | 2                     |
-| **Actual Over 3 days**     | 397                       | 1                     |
+|----------------------------|--------------------------|-----------------------|
+| **Actual Not Over 3 days** | 5920                     | 8                     |
+| **Actual Over 3 days**     | 1598                     | 8                     |
+
+**Testing Data**  
+
+|                            | Predicted Not Over 3 days | Predicted Over 3 days |
+|----------------------------|--------------------------|-----------------------|
+| **Actual Not Over 3 days** | 1484                     | 2                     |
+| **Actual Over 3 days**     | 397                      | 1                     |
 
 
 While the model has 79% accuracy, it mostly predicts quick resolutions correctly
@@ -1264,6 +1271,38 @@ delays.
 
 
 ### Part Vi
+Summarize your results to a New Yorker who is not data science savvy in several 
+bullet points.
+
+
+
+- Despite 79% accuracy, its precision is only 33%, and recall is 0%, meaning  
+  it rarely flags long response times correctly.  
+- With an AUC of 0.73, it performs better than random guessing but still  
+  misses many delays, limiting its reliability. The F1 score is 0.0049, making 
+  it nearly useless for predicting slow fixes.  
+- The confusion matrix shows that the model rarely predicts real delays. If your
+  street is flooded, it assumes the city will fix it quickly, even if  
+  it actually takes more than five days.  
+- The model relies on complaint type, borough, time of report, and  
+  neighborhood data, but these features are not strong enough to predict  
+  delays accurately.  
+- Improving the model with better algorithms, balancing data, and adding more  
+  relevant features could make it more useful.  
+- The top features impacting complaint resolution times are summer 
+  (13.6% more delays), high-unemployment areas (11.9% more delays), Brooklyn 
+  (51.2% faster), street flooding cases (45% faster), and denser areas 
+  (10.4% faster).
+
+
+
+
+
+
+
+
+
+
 
 
 
