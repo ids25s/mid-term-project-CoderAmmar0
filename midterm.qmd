@@ -1406,14 +1406,104 @@ print(df_agg.head(2))
 For each day, create two variables representing 1-day lag of the precipitation 
 and the number of CB complaints.
 
+```{python}
+# Convert date column to datetime format
+df_agg["date"] = pd.to_datetime(df_agg["date"])
+
+# Sort the data to ensure proper lagging
+df_agg = df_agg.sort_values(by=["zip_code", "date", "time(h:m)"])
+
+# Create lagged variables
+df_agg["lag_1d_precipitation"] = df_agg.groupby("zip_code")["value"].shift(1)
+df_agg["lag_1d_cb_complaints"] = df_agg.groupby("zip_code")["catch_basin_clogged/flooding_(use_comments)_(sc)"].shift(1)
+
+# Display the modified DataFrame
+print(df_agg.head(2))
+
+```
+The new columns lag_1d_precipitation and lag_1d_cb_complaints store the previous 
+day's values for each zip code.
 
 
+### Part v
+Filter data from March 1 to November 30, excluding winter months when flooding 
+is less frequent. November 30.
 
+```{python}
+# Filter data for dates between March 1 and November 30
+df_agg = df_agg[
+    (df_agg['date'].dt.month >= 3) & (df_agg['date'].dt.month <= 11)
+]
 
+# Check the unique months to ensure filtering worked
+unique_months = df_agg["date"].dt.month.unique()
+print("Filtered months:", unique_months)
 
+```
 
+It seens the filter have worked.
 
+### Part vi
+Compare a Poisson regression with a Negative Binomial regression to account for overdispersion. Which model fits better? Explain the results to a New Yorker.
 
+```{python}
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from sklearn.preprocessing import StandardScaler
+
+# Rename the dependent variable for easier formula use
+df_agg = df_agg.rename(
+    columns={"catch_basin_clogged/flooding_(use_comments)_(sc)": "cb_complaints"}
+)
+
+# Update the dependent variable name
+dependent_var = "cb_complaints"
+
+# Calculate Education Index
+df_agg['education_index'] = (df_agg['bachelor’s_degree_holders'] + df_agg['graduate_degree_holders']) / df_agg['total_population']
+
+# Calculate Unemployment Rate
+df_agg['unemployment_rate'] = df_agg['unemployed'] / df_agg['labor_force']
+
+# Define independent variables
+independent_vars = [
+    'value',  # Precipitation
+    'lag_1d_precipitation',  # Previous day's precipitation
+    'lag_1d_cb_complaints',  # Previous day's complaints
+    'education_index',  # Education level in the area
+    'unemployment_rate',  # Unemployment rate
+    'percentriseslope',  # Slope percentage 
+    'elevation',  # Elevation of the area 
+    'impervious',  # Percentage of impervious surfaces 
+]
+# Standardize numerical features for better model performance
+scaler = StandardScaler()
+df_agg[independent_vars] = scaler.fit_transform(df_agg[independent_vars])
+
+# Create formula for regression
+formula = f"{dependent_var} ~ " + " + ".join(independent_vars)
+
+# Fit a Poisson regression model
+poisson_model = smf.poisson(formula, data=df_agg).fit()
+
+# Fit a Negative Binomial regression model
+nb_model = smf.negativebinomial(formula, data=df_agg).fit()
+
+# Compare model fit using Log-Likelihood and AIC
+poisson_ll = poisson_model.llf  # Log-likelihood for Poisson
+nb_ll = nb_model.llf  # Log-likelihood for Negative Binomial
+poisson_aic = poisson_model.aic  # AIC for Poisson
+nb_aic = nb_model.aic  # AIC for Negative Binomial
+
+# Create a summary table comparing models
+model_comparison = pd.DataFrame({
+    "Model": ["Poisson Regression", "Negative Binomial Regression"],
+    "Log-Likelihood": [poisson_ll, nb_ll],
+    "AIC (Lower is Better)": [poisson_aic, nb_aic]
+})
+
+model_comparison
+```
 
 
 
