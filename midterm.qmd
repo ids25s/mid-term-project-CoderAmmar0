@@ -833,7 +833,7 @@ print(check_over3d)
 It works,as the minimum response time for category 1 exceeds 72 hours, while the
 maximum response time for category 0 remains below 72 hours.
 
-### Patt vi
+### Part vi
 Does over3d depend on the complaint descriptor, borough, or weekday
 (vs weekend/holiday)? State your hypotheses, justify your test, and 
 summarize your results.
