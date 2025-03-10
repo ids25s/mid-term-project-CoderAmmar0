@@ -1295,6 +1295,119 @@ bullet points.
   (10.4% faster).
 
 
+## Part D (Modeling the count of SF complains by zip code)
+
+### Part i
+Create a data set by aggregate the count of SF and SB complains by day for each 
+zipcode.
+
+```{python}
+df['date'] = df['created_date'].dt.date
+
+
+# Aggregate the count of complaints by day and zipcode
+df_agg = df.groupby(['date', 'zip_code', 'descriptor']).size().unstack(fill_value=0).reset_index()
+
+#Check Dataframe
+df_agg.head(5)
+```
+
+
+I have successfully created a dataset that aggregates the daily count of 
+Street Flooding and Catch Basin complaints by ZIP code.
+
+
+### Part ii
+Merge the NYC precipitation (data/rainfall_CP.csv), by day to this data set.
+
+Lets first import the dataset and view the columns.
+
+```{python}
+# Load the dataset
+df_cp = pd.read_csv("data/rainfall_CP.csv")
+
+df_cp.head(5)
+
+```
+
+I will merge the date (M/D/Y) with the aggregated dataset to integrate the 
+rainfall data with complaint counts.
+
+
+```{python}
+# Strip any whitespace from the column names
+df_cp.columns = df_cp.columns.str.strip()
+df_agg.columns = df_agg.columns.str.strip()
+
+#Rename first column to "date"
+df_cp = df_cp.rename(columns={df_cp.columns[0]: "date"})
+
+#Convert date column to datetime format
+df_cp["date"] = pd.to_datetime(df_cp["date"], errors="coerce")
+df_cp['date'] = df_cp['date'].dt.date
+
+# Perform the merge on "date"
+df_agg = df_agg.merge(df_cp, on="date", how="left")
+
+df_agg.head(3)
+```
+
+After multiple attempts at merging the dataset and resolving formatting issues, 
+we now have the correct DataFrame.
+
+### Part iii
+Merge the NYC zip code level landscape variables (data/nyc_zip_lands.csv) 
+and ACS 2023 variables into the data set.
+
+
+Lets first import the dataset and view the columns.
+```{python}
+# Load the dataset
+df_land = pd.read_csv("data/nyc_zip_lands.csv")
+
+df_land.head(5)
+
+```
+
+Lets merge on zipcode
+
+```{python}
+# Strip any whitespace from the column names
+df_land.columns = df_land.columns.str.strip()
+
+# Rename the first column of df_land to 'zip_code'
+df_land.columns.values[0] = "zip_code"
+
+
+# Fix ZIP Code Formatting in Dataset
+df_land["zip_code"] = df_land["zip_code"].astype(str)  # Convert to string
+df_land["zip_code"] = df_land["zip_code"].str.split('.').str[0]  # Remove decimal point if present
+
+#Marge the datasets
+df_agg= df_agg.merge(df_land, on="zip_code", how="left")
+
+df_agg.head(5)
+```
+
+Great. Since the ACS2023 dataset is already loaded, let's proceed with merging
+it.
+
+```{python}
+#Merge with ACS2023
+df_agg = df_agg.merge(dfacs, on="zip_code", how="left")
+
+# Convert column names to lowercase and replace spaces with underscores
+df_agg.columns = df_agg.columns.str.lower().str.replace(" ", "_")
+
+print(df_agg.head(2))
+```
+
+### Part iv
+For each day, create two variables representing 1-day lag of the precipitation 
+and the number of CB complaints.
+
+
+
 
 
 
