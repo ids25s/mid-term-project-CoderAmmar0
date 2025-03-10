@@ -1107,16 +1107,16 @@ print(class_report)
 Confusion Matrices
 
 **Training Data** 
-|                    | Predicted Non-Severe | Predicted Severe |
-|--------------------|---------------------|------------------|
-| **Actual Non-Severe** | 5920                | 8                |
-| **Actual Severe**     | 1598                | 8                |
+|                            | Predicted Not Over 3 days | Predicted Over 3 days |
+|----------------------------|---------------------------|-----------------------|
+| **Actual Not Over 3 days** | 5920                      | 8                     |
+| **Actual Over 3 days**     | 1598                      | 8                     |
 
 **Testing Data** 
-|                    | Predicted Non-Severe | Predicted Severe |
-|--------------------|---------------------|------------------|
-| **Actual Non-Severe** | 1484                | 2                |
-| **Actual Severe**     | 397                 | 1                |
+|                            | Predicted Not Over 3 days | Predicted Over 3 days |
+|----------------------------|---------------------------|-----------------------|
+| **Actual Not Over 3 days** | 1484                      | 2                     |
+| **Actual Over 3 days**     | 397                       | 1                     |
 
 
 While the model has 79% accuracy, it mostly predicts quick resolutions correctly
@@ -1138,3 +1138,132 @@ model is working, but in reality, it fails at predicting real delays.
 
 
 ### Part iv
+Construct the ROC curve of your fitted logistic model and obtain the AUROC for
+both training and testing data. Explain your results to a New Yorker.
+
+```{python}
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
+
+# Get probability predictions for both training and testing data
+y_train_prob = logit_model.predict_proba(X_train_scaled)[:, 1]
+y_test_prob = logit_model.predict_proba(X_test_scaled)[:, 1]
+
+# Compute ROC curve and AUC for training data
+fpr_train, tpr_train, _ = roc_curve(y_train, y_train_prob)
+auc_train = auc(fpr_train, tpr_train)
+
+# Compute ROC curve and AUC for testing data
+fpr_test, tpr_test, _ = roc_curve(y_test, y_test_prob)
+auc_test = auc(fpr_test, tpr_test)
+
+# Plot the ROC curves
+plt.figure(figsize=(8, 6))
+plt.plot(fpr_train, tpr_train, linestyle='--', label=f'Training Data (AUROC = {auc_train:.2f})')
+plt.plot(fpr_test, tpr_test, linestyle='-', label=f'Testing Data (AUROC = {auc_test:.2f})')
+plt.plot([0, 1], [0, 1], linestyle='dotted', color='gray')  # Random guessing line
+plt.xlabel("False Positive Rate (FPR)")
+plt.ylabel("True Positive Rate (TPR)")
+plt.title("ROC Curve for Logistic Regression Model")
+plt.legend()
+plt.show()
+
+# Output AUROC values
+auc_train, auc_test
+
+```
+
+AUC (Area Under the Curve) measures how well the model distinguishes  
+complaints that take more than three days to resolve from those that don’t. An  
+AUC of 1.0 means perfect predictions, 0.5 is like flipping a coin, and below  
+0.5 means the model is worse than random guessing.  
+
+A high AUC indicates the model effectively identifies delays, while an AUC  
+near 0.5 suggests difficulty distinguishing fast and slow responses. A very  
+low AUC means the model is failing and may even predict the opposite.  
+
+With an AUC of 0.73 on both training and testing data, the model is better  
+than random guessing but far from perfect. The ROC curve shows it has some  
+predictive power but still makes frequent mistakes.  
+
+For NYC residents, the model is not useless, as it sometimes predicts delays  
+correctly. However, it is not reliable enough to consistently warn when  
+complaints will take longer to resolve.  
+
+### Part v
+Identify the most important predictors of over3d. Use model coefficients or 
+feature importance (e.g., odds ratios, standardized coefficients, or SHAP values).
+
+#### Odds Ratio
+I will use first Odds ratios  for clearer interpretation, showing how each 
+factor impacts the likelihood of a complaint taking over three days. 
+An odds ratio above 1 increases delay odds, while below 1 reduces them.
+
+
+```{python}
+# Extract model coefficients
+coefficients = logit_model.coef_[0]
+feature_names = X.columns
+
+# Convert to odds ratios (exp of coefficients)
+odds_ratios = np.exp(coefficients)
+
+# Create a dataframe of feature importance
+importance_df = pd.DataFrame({
+    "Feature": feature_names,
+    "Coefficient": coefficients,
+    "Odds Ratio": odds_ratios
+}).sort_values(by="Odds Ratio", ascending=False)
+
+importance_df
+
+```
+
+Delays were more likely in summer (13.6%), higher unemployment areas (11.9%),  
+spring (7.2%), Manhattan (5.8%), and during rush hour (1.7%), likely due to  
+seasonal demand, resource constraints, and congestion.  
+
+Faster resolutions occurred in Brooklyn (51.2% faster), street flooding cases  
+(45% faster), denser areas (10.4% faster), better-educated neighborhoods  
+(10.4% faster), and weekend complaints (7.3% faster), possibly due to better  
+infrastructure, urgency, and lower complaint volume.  
+
+In conclusion, the top five features impacting complaint resolution times are  
+summer complaints (13.6% more delays), high unemployment areas (11.9% more  
+delays). Conversely, Brooklyn resolves complaints 1.2% faster, and high 
+population density was 11% faster,and street flooding cases are prioritized 
+45% more than Catch Basin issues due to urgency and visibility.  
+
+#### SHAP
+After researching, I decided to try  the SHAP method to analyze feature 
+importance, as it provides a more detailed and individualized explanation of
+how each factor contributes to predicting delays. 
+
+```{python}
+import shap
+
+# Ensure the SHAP explainer uses the correct feature names
+explainer = shap.Explainer(logit_model, X_test_scaled)
+shap_values = explainer(X_test_scaled)
+
+# Convert SHAP values to a DataFrame with feature names
+shap_values_df = pd.DataFrame(shap_values.values, columns=X.columns)
+
+# SHAP summary plot with correct feature names
+shap.summary_plot(shap_values.values, X_test, feature_names=X.columns)
+
+```
+
+The SHAP analysis confirms our top 5 odds ratio features.Complaints from 
+Brooklyn, areas with higher education levels, and surprisingly, complaints filed
+in summer and spring, have reduced delays. Factors such as winter, Queens, 
+housing affordability, and Staten Island show minimal impact. These findings 
+suggest targeted resource allocation and proactive management, especially in 
+denser neighborhoods and during weekends or rush hours, could help reduce 
+delays.
+
+
+### Part Vi
+
+
+
