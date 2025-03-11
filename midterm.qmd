@@ -20,10 +20,12 @@ format:
 
 ## Overview
 
-The NYC 311 Service Requests dataset contains reports related to various city issues, including sewer-related complaints. This analysis focuses on two primary sewer-related complaints for 2024:
+The NYC 311 Service Requests dataset contains reports related to various city 
+issues, including sewer-related complaints. This analysis focuses on two primary sewer-related complaints for 2024:
 
 1. **Street Flooding (SF)**: Reports of standing water or street flooding.
-2. **Catch Basin (CB)**: Reports of clogged or defective catch basins that prevent proper drainage.
+2. **Catch Basin (CB)**: Reports of clogged or defective catch basins that 
+prevent proper drainage.
 
 These complaints provide insights into both immediate street flooding issues and underlying infrastructural challenges.
 
@@ -371,10 +373,10 @@ zip_lat_long = df[df["unique_key"].isin(missing_zipcode_ids)][["unique_key", "lo
 zip_lat_long
 ```
 
-They all have to be missing the longitude and latitude data. At first, I  
-considered using geocoders to determine ZIP codes based on street addresses.  
-However, I realized that a single street address can correspond to multiple  
-ZIP codes, making it unreliable for accurate data filling.  
+They all have to be missing the longitude and latitude data. At first, I
+considered using geocoders to determine ZIP codes based on street addresses. 
+However, I realized that a single street address can correspond to multiple
+ZIP codes, making it unreliable for accurate data filling.
 
 ### Part v
 Are there date errors? Examples are earlier closed_date than created_date; closed_date and created_date matching to the second; dates exactly at midnight or noon to the second.
