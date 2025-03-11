@@ -1484,10 +1484,11 @@ df_agg[independent_vars] = scaler.fit_transform(df_agg[independent_vars])
 formula = f"{dependent_var} ~ " + " + ".join(independent_vars)
 
 # Fit a Poisson regression model
-poisson_model = smf.poisson(formula, data=df_agg).fit()
+poisson_model = smf.glm(formula, data=df_agg,family=sm.families.Poisson()).fit()
 
 # Fit a Negative Binomial regression model
-nb_model = smf.negativebinomial(formula, data=df_agg).fit()
+nb_model = smf.glm(formula, data=df_agg,family=sm.families.NegativeBinomial()).fit()
+
 
 # Compare model fit using Log-Likelihood and AIC
 poisson_ll = poisson_model.llf  # Log-likelihood for Poisson
@@ -1495,17 +1496,173 @@ nb_ll = nb_model.llf  # Log-likelihood for Negative Binomial
 poisson_aic = poisson_model.aic  # AIC for Poisson
 nb_aic = nb_model.aic  # AIC for Negative Binomial
 
+# Overdispersion check: Compute Pearson Chi-square statistic
+poisson_deviance = poisson_model.pearson_chi2 / poisson_model.df_resid
+nb_deviance = nb_model.pearson_chi2 / nb_model.df_resid
+
 # Create a summary table comparing models
 model_comparison = pd.DataFrame({
     "Model": ["Poisson Regression", "Negative Binomial Regression"],
     "Log-Likelihood": [poisson_ll, nb_ll],
-    "AIC (Lower is Better)": [poisson_aic, nb_aic]
+    "AIC (Lower is Better)": [poisson_aic, nb_aic],
+    "Deviance":[poisson_deviance,nb_deviance]
 })
 
 model_comparison
 ```
 
+Negative Binomial Summary:
+```{python}
+nb_model.summary()
+```
+Poisson Summary:
+
+```{python}
+poisson_model.summary()
+```
 
 
+We compared two models to predict how many Catch Basin complaints NYC receives  
+daily per ZIP code: Poisson Regression and Negative Binomial Regression. The  
+Poisson model assumes complaints happen at a steady, predictable rate, while  
+the Negative Binomial model accounts for unpredictable complaint spikes.  
+
+- **Log-Likelihood (Higher is Better):** This tells us how well the model fits  
+  real complaint data. A higher value means a better fit.  
+  - Poisson Regression: -135,438  
+  - Negative Binomial Regression: -157,553 (worse here, meaning it doesn’t fit  
+    the data as well)  
+
+- **AIC (Lower is Better):** This measures how accurate the model is while  
+  avoiding unnecessary complexity.  
+  - Poisson Regression: 270,894  
+  - Negative Binomial Regression: 315,125 (higher, meaning it is more complex  
+    but not necessarily better in this case)  
+
+- **Deviance (Lower is Better):** Deviance measures how much the model’s  
+  predictions differ from the data. A lower deviance means the model  
+  captures the variation in complaints more accurately.  
+  - Poisson Regression: 0.3746  
+  - Negative Binomial Regression: 0.1167 (much lower, meaning a better fit)  
 
 
+The Negative Binomial model has a much lower deviance, meaning it captures  
+fluctuations in complaints better. This is crucial because flooding complaints  
+don’t happen at a constant rate, they vary based on storms, infrastructure, and  
+city response time.  
+
+However, the Poisson model’s higher deviance suggests it assumes too much  
+consistency, making it struggle with spikes in complaints. This is called  
+overdispersion—when the variability in data is greater than what a Poisson  
+model expects. Since the Negative Binomial model naturally accounts for this  
+extra variability, it is better suited for predicting complaint patterns in  
+NYC.  
+
+In conclusion, although the Poisson model has a better log-likelihood and 
+AIC score, its high  deviance suggests it underestimates the variation in 
+complaint numbers. The  Negative Binomial model, with its lower deviance, 
+better handles unpredictable surges in complaints, making it the more reliable
+choice for real world predictions.  
+
+## Conclusion
+This analysis explored NYC flood-related complaints, focusing on response  
+times, complaint patterns, and factors influencing delays. We found that  
+Street Flooding  complaints were resolved significantly faster than Catch  
+Basin complaints, suggesting that clogged drainage infrastructure may  
+require more resources or inspections before resolution. Response times also  
+varied by borough, with Brooklyn having the quickest resolutions and Staten  
+Island showing no significant difference from the Bronx. Additionally,  
+complaints filed on weekends and holidays were slightly more likely to be  
+resolved faster, possibly due to lower complaint volume or emergency response  
+prioritization.  
+
+A predictive model for delaysconfirmed that SF complaints had lower  
+odds of remaining unresolved for over three days, while socioeconomic factors  
+like population density, unemployment rate, and housing affordability played a  
+role in complaint patterns. However, the logistic model struggled with class  
+imbalance, limiting predictive power. A Negative Binomial model provided a  
+better fit than Poisson regression due to overdispersion in daily CB complaint  
+counts, reinforcing the need for models that accommodate count variability.  
+
+# Further Exploration
+I've decided to visualize additional variables and further explore the dataset 
+to identify any potential trends.
+
+
+## Rolling Average of Complaints Per Week
+
+```{python}
+# Aggregate complaint counts per day
+df_daily_counts = df.groupby(df['created_date'].dt.date).size().reset_index(name='total_complaints')
+
+# Convert back to datetime for plotting
+df_daily_counts['created_date'] = pd.to_datetime(df_daily_counts['created_date'])
+
+# Calculate a 7-day rolling average
+df_daily_counts['rolling_avg'] = df_daily_counts['total_complaints'].rolling(window=7).mean()
+
+# Plot rolling average of complaints per week
+plt.figure(figsize=(12, 6))
+plt.plot(df_daily_counts['created_date'], df_daily_counts['total_complaints'], alpha=0.4, label='Daily Complaints')
+plt.plot(df_daily_counts['created_date'], df_daily_counts['rolling_avg'], color='red', label='7-Day Rolling Avg')
+
+plt.xlabel("Date")
+plt.ylabel("Number of Complaints")
+plt.title("NYC Flood Complaints Over Time (With Weekly Rolling Average)")
+plt.legend()
+plt.show()
+```
+
+I wanted to analyze the rolling average of complaints per week to smooth out 
+daily fluctuations and identify seasonal trends in flooding related issues. This
+helps reveal whether complaint volumes increase during certain times of the 
+year, such as heavy rainfall seasons, and allows for a better understanding 
+of longterm patterns rather than just day to day variations.
+## Density of Catch Basin and Street Flooding
+
+```{python}
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import contextily as ctx
+import seaborn as sns
+
+# Ensure latitude and longitude exist and drop missing values
+df_filtered = df.dropna(subset=['latitude', 'longitude', 'descriptor'])
+
+# Convert DataFrame to GeoDataFrame
+gdf = gpd.GeoDataFrame(df_filtered, 
+                       geometry=gpd.points_from_xy(df_filtered.longitude, df_filtered.latitude), 
+                       crs="EPSG:4326")
+
+gdf = gdf.to_crs(epsg=3857)
+
+# Split into two GeoDataFrames for CB and SF complaints
+gdf_cb = gdf[gdf['descriptor'].str.contains("Catch Basin", na=False)]
+gdf_sf = gdf[gdf['descriptor'].str.contains("Street Flooding", na=False)]
+
+# Plot Heatmaps for CB and SF Complaints
+fig, ax = plt.subplots(1, 2, figsize=(16, 8))
+
+# Plot CB Complaints Density
+sns.kdeplot(x=gdf_cb.geometry.x, y=gdf_cb.geometry.y, cmap="Blues", fill=True, ax=ax[0], alpha=0.7)
+ctx.add_basemap(ax[0], source=ctx.providers.CartoDB.Positron)
+ax[0].set_title("Density of Catch Basin Complaints in NYC")
+ax[0].set_xticks([])
+ax[0].set_yticks([])
+
+# Plot SF Complaints Density
+sns.kdeplot(x=gdf_sf.geometry.x, y=gdf_sf.geometry.y, cmap="Reds", fill=True, ax=ax[1], alpha=0.7)
+ctx.add_basemap(ax[1], source=ctx.providers.CartoDB.Positron)
+ax[1].set_title("Density of Street Flooding Complaints in NYC")
+ax[1].set_xticks([])
+ax[1].set_yticks([])
+
+plt.tight_layout()
+plt.show()
+
+```
+I wanted to visualize the density of Catch Basin and Street Flooding complaints 
+to understand where flooding-related issues are most concentrated across NYC. 
+By mapping these complaints separately, I could identify problem hotspots and 
+observe whether CB blockages correlate with areas experiencing frequent street 
+flooding. 
